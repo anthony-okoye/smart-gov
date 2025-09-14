@@ -12,8 +12,8 @@ A citizen feedback management system that enables government agencies to collect
 
 ## Tech Stack
 
-- **Frontend**: Next.js 14, React 18, Tailwind CSS
-- **Backend**: Node.js, Express.js, TypeScript
+- **Frontend**: Next.js 14, React 18, Tailwind CSS (in `frontend/` directory)
+- **Backend**: Node.js, Express.js, TypeScript (in `server/` directory)
 - **Database**: TiDB Serverless (MySQL-compatible with vector search)
 - **AI Processing**: Custom agents with OpenAI API
 
@@ -28,38 +28,35 @@ A citizen feedback management system that enables government agencies to collect
 ### Installation
 
 1. Clone the repository
-2. Install dependencies:
+
+2. Set up the backend server:
    ```bash
+   cd server
    npm install
-   ```
-
-3. Copy environment variables:
-   ```bash
    cp .env.example .env
+   # Update .env with your database credentials
+   npm run dev
    ```
 
-4. Update `.env` with your database and API credentials
-
-5. Start the development servers:
+3. Set up the frontend (in another terminal):
    ```bash
-   # Start Next.js frontend
+   cd frontend
+   npm install
    npm run dev
-
-   # Start Express backend (in another terminal)
-   npm run server:dev
    ```
 
 ## Project Structure
 
 ```
-├── src/                    # Next.js frontend
-│   ├── app/               # App router pages
-│   ├── components/        # React components
-│   └── lib/              # Utility functions
-├── server/                # Express backend
+├── frontend/              # Next.js frontend application
+│   ├── src/              # Source code
+│   ├── public/           # Static assets
+│   └── package.json      # Frontend dependencies
+├── server/               # Express backend server
 │   ├── routes/           # API routes
 │   ├── models/           # Data models
-│   └── agents/           # AI agents
+│   ├── agents/           # AI agents
+│   └── package.json      # Server dependencies
 └── .kiro/                # Kiro specs and configuration
 ```
 
@@ -68,3 +65,5 @@ A citizen feedback management system that enables government agencies to collect
 - Frontend runs on http://localhost:3000
 - Backend API runs on http://localhost:3001
 - API health check: http://localhost:3001/health
+
+Each component (frontend/server) has its own package.json and can be developed independently.

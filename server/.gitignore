@@ -8,14 +8,25 @@ yarn-error.log*
 .env
 .env*.local
 
-# Build outputs
-/build
-/dist
+# Build output
+dist/
+build/
+
+# TypeScript
 *.tsbuildinfo
 
 # Logs
 logs
 *.log
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
 
 # OS generated files
 .DS_Store
@@ -25,13 +36,3 @@ logs
 .Trashes
 ehthumbs.db
 Thumbs.db
-
-# IDE files
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# Temporary files
-*.tmp
-*.temp
