@@ -164,7 +164,9 @@
   - Add basic routing for dashboard pages
   - _Requirements: 9.1, 9.2, 9.3_
 
-- [ ] 13. Create feedback table component
+- [x] 13. Create feedback table component
+
+
 
 
 
