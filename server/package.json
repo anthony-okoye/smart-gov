@@ -1,7 +1,8 @@
 {
   "name": "smartgov-server",
   "version": "0.1.0",
-  "private": true,
+  "description": "Backend API server for SmartGov Assistant - AI-powered government feedback analysis system",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "start": "tsx index.ts",

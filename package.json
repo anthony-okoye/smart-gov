@@ -1,0 +1,35 @@
+{
+  "name": "smartgov-assistant",
+  "version": "1.0.0",
+  "description": "AI-powered government feedback analysis system that helps citizens submit feedback and provides government officials with insights through sentiment analysis, categorization, and trend identification.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/smartgov-assistant.git"
+  },
+  "keywords": [
+    "government",
+    "feedback",
+    "ai",
+    "sentiment-analysis",
+    "public-services",
+    "citizen-engagement"
+  ],
+  "author": "SmartGov Assistant Team",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:frontend\"",
+    "dev:server": "cd server && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build": "npm run build:server && npm run build:frontend",
+    "build:server": "cd server && npm run build",
+    "build:frontend": "cd frontend && npm run build",
+    "test": "npm run test:server && npm run test:frontend",
+    "test:server": "cd server && npm test",
+    "test:frontend": "cd frontend && npm test",
+    "start": "npm run start:server",
+    "start:server": "cd server && npm start"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
