@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { testConnection, closePool } from './config/database.js';
+import feedbackRoutes from './routes/feedback.js';
 
 // Load environment variables
 dotenv.config();
@@ -95,31 +96,10 @@ app.get('/api', (req, res) => {
   });
 });
 
-// Feedback routes
-app.post('/api/feedback', async (req, res, next) => {
-  try {
-    // TODO: Implement feedback submission in task 5
-    res.status(501).json({
-      error: 'Not implemented',
-      message: 'Feedback submission endpoint will be implemented in task 5'
-    });
-  } catch (error) {
-    next(error);
-  }
-});
+// API routes
+app.use('/api/feedback', feedbackRoutes);
 
-app.get('/api/feedback', async (req, res, next) => {
-  try {
-    // TODO: Implement feedback retrieval in task 6
-    res.status(501).json({
-      error: 'Not implemented',
-      message: 'Feedback retrieval endpoint will be implemented in task 6'
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
+// Placeholder routes for future tasks
 app.get('/api/feedback/search', async (req, res, next) => {
   try {
     // TODO: Implement search functionality in task 11
