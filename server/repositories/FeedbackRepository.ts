@@ -1,6 +1,7 @@
 import { BaseRepository } from './BaseRepository.js';
 import { Feedback, FeedbackQueryResult, FeedbackCreateInput, FeedbackUpdateInput } from '../types/database.js';
 import { validateFeedbackInput, normalizeFeedbackInput } from '../validation/index.js';
+import { SearchResult, VectorEmbedding } from '../services/VectorService.js';
 import { v4 as uuidv4 } from 'uuid';
 
 export class FeedbackRepository extends BaseRepository {
@@ -201,5 +202,156 @@ export class FeedbackRepository extends BaseRepository {
     const sql = `DELETE FROM ${this.tableName} WHERE created_at < DATE_SUB(NOW(), INTERVAL ? DAY)`;
     const result = await this.query(sql, [days]);
     return result.affectedRows || 0;
+  }
+
+  // Update feedback with vector embedding
+  async updateVectorEmbedding(id: string, embedding: VectorEmbedding): Promise<boolean> {
+    const embeddingData = {
+      vector: embedding.vector,
+      model: embedding.model,
+      dimensions: embedding.dimensions,
+      generated_at: new Date().toISOString()
+    };
+
+    return await this.updateById(id, {
+      vector_embedding: JSON.stringify(embeddingData),
+      updated_at: new Date()
+    });
+  }
+
+  // Get feedback without vector embeddings
+  async getFeedbackWithoutEmbeddings(limit: number = 100): Promise<Feedback[]> {
+    return await this.findMany<Feedback>(
+      'vector_embedding IS NULL OR vector_embedding = ""',
+      [],
+      'created_at ASC',
+      limit
+    );
+  }
+
+  // Vector search using cosine similarity (in-memory calculation)
+  async vectorSearch(queryEmbedding: number[], limit: number = 50, threshold: number = 0.1): Promise<SearchResult[]> {
+    // Get all feedback with embeddings
+    const sql = `
+      SELECT id, text, category, sentiment, timestamp, vector_embedding
+      FROM ${this.tableName}
+      WHERE vector_embedding IS NOT NULL 
+        AND vector_embedding != ''
+        AND processed = TRUE
+      ORDER BY timestamp DESC
+      LIMIT 1000
+    `;
+    
+    const feedbackRows = await this.query(sql);
+    const results: SearchResult[] = [];
+
+    for (const row of feedbackRows) {
+      try {
+        const embeddingData = JSON.parse(row.vector_embedding);
+        if (!embeddingData.vector || !Array.isArray(embeddingData.vector)) {
+          continue;
+        }
+
+        // Calculate cosine similarity
+        const similarity = this.calculateCosineSimilarity(queryEmbedding, embeddingData.vector);
+        const relevanceScore = Math.max(0, (similarity + 1) / 2); // Convert to 0-1 scale
+
+        if (relevanceScore >= threshold) {
+          results.push({
+            feedback_id: row.id,
+            text: row.text,
+            category: row.category,
+            sentiment: row.sentiment,
+            timestamp: row.timestamp,
+            relevance_score: relevanceScore
+          });
+        }
+      } catch (error) {
+        console.error(`Error processing embedding for feedback ${row.id}:`, error);
+        continue;
+      }
+    }
+
+    // Sort by relevance score (highest first) and limit results
+    return results
+      .sort((a, b) => b.relevance_score - a.relevance_score)
+      .slice(0, limit);
+  }
+
+  // Helper method for cosine similarity calculation
+  private calculateCosineSimilarity(vectorA: number[], vectorB: number[]): number {
+    if (vectorA.length !== vectorB.length) {
+      return 0;
+    }
+
+    let dotProduct = 0;
+    let normA = 0;
+    let normB = 0;
+
+    for (let i = 0; i < vectorA.length; i++) {
+      dotProduct += vectorA[i] * vectorB[i];
+      normA += vectorA[i] * vectorA[i];
+      normB += vectorB[i] * vectorB[i];
+    }
+
+    normA = Math.sqrt(normA);
+    normB = Math.sqrt(normB);
+
+    if (normA === 0 || normB === 0) {
+      return 0;
+    }
+
+    return dotProduct / (normA * normB);
+  }
+
+  // Hybrid search combining text and vector search
+  async hybridSearch(
+    queryText: string, 
+    queryEmbedding: number[], 
+    limit: number = 50,
+    textWeight: number = 0.3,
+    vectorWeight: number = 0.7
+  ): Promise<SearchResult[]> {
+    // Get text search results
+    const textResults = await this.searchByText(queryText, limit * 2);
+    
+    // Get vector search results
+    const vectorResults = await this.vectorSearch(queryEmbedding, limit * 2, 0.1);
+    
+    // Combine and score results
+    const combinedResults = new Map<string, SearchResult>();
+    
+    // Add text search results with text score
+    textResults.forEach((feedback, index) => {
+      const textScore = Math.max(0, 1 - (index / textResults.length));
+      combinedResults.set(feedback.id, {
+        feedback_id: feedback.id,
+        text: feedback.text,
+        category: feedback.category,
+        sentiment: feedback.sentiment,
+        timestamp: feedback.timestamp,
+        relevance_score: textScore * textWeight
+      });
+    });
+    
+    // Add/update with vector search results
+    vectorResults.forEach(result => {
+      const existing = combinedResults.get(result.feedback_id);
+      if (existing) {
+        // Combine scores
+        existing.relevance_score += result.relevance_score * vectorWeight;
+      } else {
+        // Add new result with vector score only
+        combinedResults.set(result.feedback_id, {
+          ...result,
+          relevance_score: result.relevance_score * vectorWeight
+        });
+      }
+    });
+    
+    // Sort by combined relevance score and return top results
+    return Array.from(combinedResults.values())
+      .sort((a, b) => b.relevance_score - a.relevance_score)
+      .slice(0, limit);
   }
 }
