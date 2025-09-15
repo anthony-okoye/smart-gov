@@ -1,4 +1,66 @@
-export default function SearchPage() {
+'use client'
+
+import { useState, useEffect, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { SearchBar, SearchResults } from '@/components'
+import { SearchResult } from '@/types'
+import { apiClient } from '@/lib/api'
+
+function SearchPageContent() {
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([])
+  const [currentQuery, setCurrentQuery] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [showRelevanceScores, setShowRelevanceScores] = useState(false)
+  const [showSentimentAnalysis, setShowSentimentAnalysis] = useState(false)
+  
+  const searchParams = useSearchParams()
+
+  // Handle URL query parameter on mount
+  useEffect(() => {
+    const urlQuery = searchParams.get('q')
+    if (urlQuery) {
+      setCurrentQuery(urlQuery)
+      performSearch(urlQuery)
+    }
+  }, [searchParams])
+
+  const performSearch = async (query: string) => {
+    if (!query.trim()) {
+      setSearchResults([])
+      setCurrentQuery('')
+      return
+    }
+
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      const response = await apiClient.searchFeedback(query, 50)
+      setSearchResults(response.results)
+      setCurrentQuery(query)
+    } catch (error) {
+      console.error('Search failed:', error)
+      setError('Search failed. Please try again.')
+      setSearchResults([])
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleSearchResults = (results: SearchResult[], query: string) => {
+    setSearchResults(results)
+    setCurrentQuery(query)
+  }
+
+  const handleLoading = (loading: boolean) => {
+    setIsLoading(loading)
+  }
+
+  const handleError = (error: string | null) => {
+    setError(error)
+  }
+
   return (
     <div className="space-y-6">
       {/* Page header */}
@@ -18,19 +80,13 @@ export default function SearchPage() {
             <label htmlFor="search-query" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Search Query
             </label>
-            <div className="relative">
-              <input
-                type="text"
-                id="search-query"
-                placeholder="Enter your search query (e.g., 'road conditions', 'healthcare services')..."
-                className="w-full px-4 py-3 pl-10 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
-              />
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </div>
-            </div>
+            <SearchBar
+              onSearchResults={handleSearchResults}
+              onLoading={handleLoading}
+              onError={handleError}
+              placeholder="Enter your search query (e.g., 'road conditions', 'healthcare services')..."
+              initialQuery={currentQuery}
+            />
           </div>
           
           <div className="flex justify-between items-center">
@@ -38,6 +94,8 @@ export default function SearchPage() {
               <label className="flex items-center">
                 <input
                   type="checkbox"
+                  checked={showSentimentAnalysis}
+                  onChange={(e) => setShowSentimentAnalysis(e.target.checked)}
                   className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                 />
                 <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
@@ -47,6 +105,8 @@ export default function SearchPage() {
               <label className="flex items-center">
                 <input
                   type="checkbox"
+                  checked={showRelevanceScores}
+                  onChange={(e) => setShowRelevanceScores(e.target.checked)}
                   className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                 />
                 <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
@@ -54,35 +114,19 @@ export default function SearchPage() {
                 </span>
               </label>
             </div>
-            
-            <button className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 transition-colors">
-              Search
-            </button>
           </div>
         </div>
       </div>
 
       {/* Search results */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-lg font-medium text-gray-900 dark:text-white">
-            Search Results
-          </h2>
-        </div>
-        <div className="p-6">
-          <div className="text-center py-12">
-            <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">
-              No search performed
-            </h3>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Enter a search query above to find relevant feedback using AI-powered vector search.
-            </p>
-          </div>
-        </div>
-      </div>
+      <SearchResults
+        results={searchResults}
+        query={currentQuery}
+        loading={isLoading}
+        error={error}
+        showRelevanceScores={showRelevanceScores}
+        showSentimentAnalysis={showSentimentAnalysis}
+      />
 
       {/* Search tips */}
       <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-6">
@@ -97,5 +141,24 @@ export default function SearchPage() {
         </ul>
       </div>
     </div>
+  )
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense fallback={
+      <div className="space-y-6">
+        <div className="border-b border-gray-200 dark:border-gray-700 pb-4">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+            Search Feedback
+          </h1>
+          <p className="mt-2 text-gray-600 dark:text-gray-400">
+            Loading search interface...
+          </p>
+        </div>
+      </div>
+    }>
+      <SearchPageContent />
+    </Suspense>
   )
 }

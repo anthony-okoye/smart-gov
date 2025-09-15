@@ -243,7 +243,7 @@ describe('SummaryPanel', () => {
     mockApiClient.getSummary.mockResolvedValue({
       success: false,
       message: 'Server error',
-      data: null as any
+      data: null as never
     })
 
     render(<SummaryPanel />)
