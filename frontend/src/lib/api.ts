@@ -1,4 +1,4 @@
-import { ApiResponse, PaginatedResponse, Feedback, SearchResponse } from '@/types'
+import { ApiResponse, PaginatedResponse, Feedback, SearchResponse, CategorySummary, Trend } from '@/types'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
 
@@ -72,8 +72,8 @@ class ApiClient {
 
   // Summary endpoints
   async getSummary(): Promise<ApiResponse<{
-    categories: any[]
-    trends: any[]
+    categories: CategorySummary[]
+    trends: Trend[]
     lastUpdated: string
   }>> {
     return this.request('/api/summary')
@@ -82,8 +82,8 @@ class ApiClient {
   // Analytics endpoints
   async getAnalytics(): Promise<ApiResponse<{
     totalFeedback: number
-    sentimentDistribution: any
-    categoryDistribution: any
+    sentimentDistribution: Record<string, number>
+    categoryDistribution: Record<string, number>
   }>> {
     return this.request('/api/analytics')
   }

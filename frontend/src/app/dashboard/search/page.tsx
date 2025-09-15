@@ -90,10 +90,10 @@ export default function SearchPage() {
           Search Tips
         </h3>
         <ul className="text-sm text-blue-800 dark:text-blue-300 space-y-1">
-          <li>• Use natural language queries like "complaints about road conditions"</li>
-          <li>• Search for specific topics like "healthcare access" or "public transportation"</li>
-          <li>• Include sentiment keywords like "positive feedback about parks"</li>
-          <li>• Try broader terms if you don't find specific results</li>
+          <li>• Use natural language queries like &quot;complaints about road conditions&quot;</li>
+          <li>• Search for specific topics like &quot;healthcare access&quot; or &quot;public transportation&quot;</li>
+          <li>• Include sentiment keywords like &quot;positive feedback about parks&quot;</li>
+          <li>• Try broader terms if you don&apos;t find specific results</li>
         </ul>
       </div>
     </div>
