@@ -1,10 +1,12 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { FeedbackRepository } from '../repositories/FeedbackRepository.js';
+import { FeedbackService } from '../services/FeedbackService.js';
 import { FeedbackCreateInput } from '../types/database.js';
 import { validateFeedbackInput, normalizeFeedbackInput } from '../validation/feedback.js';
 
 const router = Router();
 const feedbackRepository = new FeedbackRepository();
+const feedbackService = new FeedbackService();
 
 // POST /api/feedback - Submit new feedback
 router.post('/', async (req: Request, res: Response, next: NextFunction) => {
@@ -37,8 +39,8 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       });
     }
 
-    // Create feedback in database
-    const feedback = await feedbackRepository.create(normalized);
+    // Create feedback and trigger async categorization
+    const feedback = await feedbackService.createFeedback(normalized);
 
     // Return success response
     res.status(201).json({
@@ -203,6 +205,49 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     }
 
     // Pass other errors to global error handler
+    next(error);
+  }
+});
+
+// GET /api/feedback/stats - Get processing statistics
+router.get('/stats', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const stats = await feedbackService.getProcessingStats();
+    
+    res.status(200).json({
+      status: 'success',
+      data: stats
+    });
+  } catch (error) {
+    console.error('Error retrieving processing stats:', error);
+    next(error);
+  }
+});
+
+// POST /api/feedback/reprocess - Reprocess failed feedback
+router.post('/reprocess', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const limit = parseInt(req.body.limit as string) || 10;
+    
+    if (limit < 1 || limit > 100) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        message: 'Limit must be between 1 and 100',
+        details: ['limit must be between 1 and 100']
+      });
+    }
+    
+    const reprocessedCount = await feedbackService.reprocessFailedFeedback(limit);
+    
+    res.status(200).json({
+      status: 'success',
+      message: `Reprocessed ${reprocessedCount} feedback items`,
+      data: {
+        reprocessedCount
+      }
+    });
+  } catch (error) {
+    console.error('Error reprocessing feedback:', error);
     next(error);
   }
 });
