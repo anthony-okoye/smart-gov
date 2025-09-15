@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { testConnection, closePool } from './config/database.js';
 import feedbackRoutes from './routes/feedback.js';
+import summaryRoutes from './routes/summary.js';
 
 // Load environment variables
 dotenv.config();
@@ -98,6 +99,7 @@ app.get('/api', (req, res) => {
 
 // API routes
 app.use('/api/feedback', feedbackRoutes);
+app.use('/api/summary', summaryRoutes);
 
 // Placeholder routes for future tasks
 app.get('/api/feedback/search', async (req, res, next) => {
@@ -106,19 +108,6 @@ app.get('/api/feedback/search', async (req, res, next) => {
     res.status(501).json({
       error: 'Not implemented',
       message: 'Search functionality will be implemented in task 11'
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
-// Summary routes
-app.get('/api/summary', async (req, res, next) => {
-  try {
-    // TODO: Implement summary endpoint in task 10
-    res.status(501).json({
-      error: 'Not implemented',
-      message: 'Summary endpoint will be implemented in task 10'
     });
   } catch (error) {
     next(error);

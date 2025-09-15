@@ -1,4 +1,4 @@
-import OpenAI from 'openai';
+import { HfInference } from '@huggingface/inference';
 import { SummarizationResult, CategoryInsight, Trend, AgentConfig } from './types.js';
 import { Feedback } from '../types/database.js';
 import { FeedbackRepository } from '../repositories/FeedbackRepository.js';
@@ -18,24 +18,19 @@ export class AgentError extends Error {
 }
 
 export class SummarizerAgent {
-  private openai: OpenAI;
+  private hf: HfInference;
   private config: AgentConfig;
   private feedbackRepo: FeedbackRepository;
   private cacheRepo: SummaryCacheRepository;
 
-  constructor(apiKey: string, config: Partial<AgentConfig> = {}) {
-    if (!apiKey) {
-      throw new Error('OpenAI API key is required');
-    }
-
-    this.openai = new OpenAI({
-      apiKey: apiKey,
-    });
+  constructor(apiKey?: string, config: Partial<AgentConfig> = {}) {
+    // Hugging Face API key is optional for free inference
+    this.hf = new HfInference(apiKey);
 
     this.config = {
       maxRetries: config.maxRetries || 3,
       retryDelay: config.retryDelay || 1000,
-      timeout: config.timeout || 60000, // Longer timeout for summarization
+      timeout: config.timeout || 30000, // Shorter timeout for free inference
       ...config,
     };
 
@@ -128,25 +123,19 @@ export class SummarizerAgent {
       const aiInsights = await this.executeWithRetry(async () => {
         const prompt = this.buildCategoryAnalysisPrompt(category, feedbackItems);
         
-        const response = await this.openai.chat.completions.create({
-          model: 'gpt-3.5-turbo',
-          messages: [
-            {
-              role: 'system',
-              content: 'You are an AI assistant that analyzes citizen feedback for government services. Respond with valid JSON only.'
-            },
-            {
-              role: 'user',
-              content: prompt
-            }
-          ],
-          temperature: 0.3,
-          max_tokens: 500,
+        const response = await this.hf.textGeneration({
+          model: 'gpt2',
+          inputs: prompt,
+          parameters: {
+            max_new_tokens: 500,
+            temperature: 0.3,
+            return_full_text: false,
+          },
         });
 
-        const content = response.choices[0]?.message?.content;
+        const content = response.generated_text;
         if (!content) {
-          throw new AgentError('No response received from OpenAI');
+          throw new AgentError('No response received from Hugging Face');
         }
 
         return this.parseCategoryInsightsResponse(content);
@@ -175,25 +164,19 @@ export class SummarizerAgent {
     return this.executeWithRetry(async () => {
       const prompt = this.buildTrendAnalysisPrompt(feedback);
       
-      const response = await this.openai.chat.completions.create({
-        model: 'gpt-3.5-turbo',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are an AI assistant that identifies trends in citizen feedback. Respond with valid JSON only.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: 0.3,
-        max_tokens: 600,
+      const response = await this.hf.textGeneration({
+        model: 'gpt2',
+        inputs: prompt,
+        parameters: {
+          max_new_tokens: 600,
+          temperature: 0.3,
+          return_full_text: false,
+        },
       });
 
-      const content = response.choices[0]?.message?.content;
+      const content = response.generated_text;
       if (!content) {
-        throw new AgentError('No response received from OpenAI');
+        throw new AgentError('No response received from Hugging Face');
       }
 
       return this.parseTrendsResponse(content);
@@ -214,25 +197,19 @@ export class SummarizerAgent {
     return this.executeWithRetry(async () => {
       const prompt = this.buildComplaintsExtractionPrompt(negativeFeedback);
       
-      const response = await this.openai.chat.completions.create({
-        model: 'gpt-3.5-turbo',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are an AI assistant that extracts key complaints from citizen feedback. Respond with valid JSON only.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: 0.2,
-        max_tokens: 400,
+      const response = await this.hf.textGeneration({
+        model: 'gpt2',
+        inputs: prompt,
+        parameters: {
+          max_new_tokens: 400,
+          temperature: 0.2,
+          return_full_text: false,
+        },
       });
 
-      const content = response.choices[0]?.message?.content;
+      const content = response.generated_text;
       if (!content) {
-        throw new AgentError('No response received from OpenAI');
+        throw new AgentError('No response received from Hugging Face');
       }
 
       return this.parseComplaintsResponse(content);
@@ -250,25 +227,19 @@ export class SummarizerAgent {
     return this.executeWithRetry(async () => {
       const prompt = this.buildRecommendationsPrompt(insights, trends);
       
-      const response = await this.openai.chat.completions.create({
-        model: 'gpt-3.5-turbo',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are an AI assistant that generates actionable recommendations for government officials based on citizen feedback analysis. Respond with valid JSON only.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: 0.4,
-        max_tokens: 500,
+      const response = await this.hf.textGeneration({
+        model: 'gpt2',
+        inputs: prompt,
+        parameters: {
+          max_new_tokens: 500,
+          temperature: 0.4,
+          return_full_text: false,
+        },
       });
 
-      const content = response.choices[0]?.message?.content;
+      const content = response.generated_text;
       if (!content) {
-        throw new AgentError('No response received from OpenAI');
+        throw new AgentError('No response received from Hugging Face');
       }
 
       return this.parseRecommendationsResponse(content);
@@ -279,10 +250,10 @@ export class SummarizerAgent {
    * Builds prompt for category analysis
    */
   private buildCategoryAnalysisPrompt(category: string, feedback: Feedback[]): string {
-    const feedbackTexts = feedback.slice(0, 20).map(item => `"${item.text}"`).join('\n');
+    const feedbackTexts = feedback.slice(0, 15).map(item => `"${item.text}"`).join('\n');
     
-    return `
-Analyze the following ${category} feedback and identify key issues and trends. Respond with valid JSON only.
+    return `<|system|>You are an AI assistant that analyzes citizen feedback for government services. You must respond with valid JSON only.<|endoftext|>
+<|user|>Analyze the following ${category} feedback and identify key issues and trends.
 
 Category: ${category}
 Number of feedback items: ${feedback.length}
@@ -293,13 +264,12 @@ Identify:
 1. Key issues (3-5 main problems mentioned)
 2. Trends (2-3 patterns or recurring themes)
 
-Example response:
+Respond with JSON in this exact format:
 {
-  "keyIssues": ["Long wait times", "Poor service quality", "Lack of staff"],
-  "trends": ["Increasing complaints about wait times", "More mentions of staff shortages"]
-}
-
-Respond with JSON only:`;
+  "keyIssues": ["issue1", "issue2", "issue3"],
+  "trends": ["trend1", "trend2"]
+}<|endoftext|>
+<|assistant|>`;
   }
 
   /**
@@ -307,66 +277,58 @@ Respond with JSON only:`;
    */
   private buildTrendAnalysisPrompt(feedback: Feedback[]): string {
     // Group feedback by time periods and analyze changes
-    const recentFeedback = feedback.slice(0, 30);
-    const olderFeedback = feedback.slice(30, 60);
+    const recentFeedback = feedback.slice(0, 20);
+    const olderFeedback = feedback.slice(20, 40);
     
     const recentTexts = recentFeedback.map(item => item.text).join(' ');
     const olderTexts = olderFeedback.map(item => item.text).join(' ');
     
-    return `
-Identify emerging trends by comparing recent vs older feedback. Respond with valid JSON only.
+    return `<|system|>You are an AI assistant that identifies trends in citizen feedback. You must respond with valid JSON only.<|endoftext|>
+<|user|>Identify emerging trends by comparing recent vs older feedback.
 
 Recent feedback (${recentFeedback.length} items):
-${recentTexts.substring(0, 1000)}
+${recentTexts.substring(0, 800)}
 
 Older feedback (${olderFeedback.length} items):
-${olderTexts.substring(0, 1000)}
+${olderTexts.substring(0, 800)}
 
-Identify trends with:
-- topic: The main subject/issue
-- frequency: How often it's mentioned (1-10 scale)
-- sentimentChange: Change in sentiment (-1 to 1, negative means getting worse)
-- timeframe: "recent" or "emerging"
-
-Example response:
+Respond with JSON in this exact format:
 {
   "trends": [
     {
-      "topic": "Road maintenance delays",
-      "frequency": 7,
-      "sentimentChange": -0.3,
+      "topic": "topic name",
+      "frequency": 5,
+      "sentimentChange": -0.2,
       "timeframe": "recent"
     }
   ]
-}
-
-Respond with JSON only:`;
+}<|endoftext|>
+<|assistant|>`;
   }
 
   /**
    * Builds prompt for complaints extraction
    */
   private buildComplaintsExtractionPrompt(feedback: Feedback[]): string {
-    const complaintsText = feedback.slice(0, 25).map(item => item.text).join('\n');
+    const complaintsText = feedback.slice(0, 15).map(item => item.text).join('\n');
     
-    return `
-Extract the top 5 key complaints from this negative feedback. Respond with valid JSON only.
+    return `<|system|>You are an AI assistant that extracts key complaints from citizen feedback. You must respond with valid JSON only.<|endoftext|>
+<|user|>Extract the top 5 key complaints from this negative feedback.
 
 Negative feedback:
 ${complaintsText}
 
 Extract specific, actionable complaints that government officials should address.
 
-Example response:
+Respond with JSON in this exact format:
 {
   "complaints": [
-    "Hospital emergency wait times exceed 4 hours",
-    "Potholes on Main Street causing vehicle damage",
-    "Insufficient police presence in downtown area"
+    "complaint1",
+    "complaint2",
+    "complaint3"
   ]
-}
-
-Respond with JSON only:`;
+}<|endoftext|>
+<|assistant|>`;
   }
 
   /**
@@ -381,8 +343,8 @@ Respond with JSON only:`;
       `${trend.topic} (frequency: ${trend.frequency})`
     ).join('\n');
     
-    return `
-Generate actionable recommendations for government officials based on this analysis. Respond with valid JSON only.
+    return `<|system|>You are an AI assistant that generates actionable recommendations for government officials based on citizen feedback analysis. You must respond with valid JSON only.<|endoftext|>
+<|user|>Generate actionable recommendations for government officials based on this analysis.
 
 Category Insights:
 ${insightsText}
@@ -392,16 +354,15 @@ ${trendsText}
 
 Generate 3-5 specific, actionable recommendations that address the most critical issues.
 
-Example response:
+Respond with JSON in this exact format:
 {
   "recommendations": [
-    "Increase staffing at emergency departments to reduce wait times",
-    "Implement proactive road maintenance program for high-traffic areas",
-    "Establish community policing initiatives in downtown district"
+    "recommendation1",
+    "recommendation2",
+    "recommendation3"
   ]
-}
-
-Respond with JSON only:`;
+}<|endoftext|>
+<|assistant|>`;
   }
 
   /**
