@@ -76,6 +76,28 @@ export interface CategoryStats {
   other: number;
 }
 
+// Input types for validation
+export interface FeedbackCreateInput {
+  text: string;
+  category?: 'health' | 'infrastructure' | 'safety' | 'other';
+  sentiment?: number;
+  confidence?: number;
+}
+
+export interface FeedbackUpdateInput {
+  text?: string;
+  category?: 'health' | 'infrastructure' | 'safety' | 'other';
+  sentiment?: number;
+  confidence?: number;
+  processed?: boolean;
+}
+
+// Validation result interface
+export interface ValidationResult {
+  isValid: boolean;
+  errors: string[];
+}
+
 // Database connection configuration
 export interface DatabaseConfig {
   host: string;

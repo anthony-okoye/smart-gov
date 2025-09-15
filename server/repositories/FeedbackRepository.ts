@@ -1,5 +1,6 @@
 import { BaseRepository } from './BaseRepository.js';
-import { Feedback, FeedbackQueryResult } from '../types/database.js';
+import { Feedback, FeedbackQueryResult, FeedbackCreateInput, FeedbackUpdateInput } from '../types/database.js';
+import { validateFeedbackInput, normalizeFeedbackInput } from '../validation/index.js';
 import { v4 as uuidv4 } from 'uuid';
 
 export class FeedbackRepository extends BaseRepository {
@@ -7,13 +8,27 @@ export class FeedbackRepository extends BaseRepository {
     super('feedback');
   }
 
-  // Create new feedback
-  async create(feedbackData: Omit<Feedback, 'id' | 'created_at' | 'updated_at'>): Promise<Feedback> {
+  // Create new feedback with validation
+  async create(feedbackInput: FeedbackCreateInput): Promise<Feedback> {
+    // Normalize and validate input
+    const { normalized, validation } = normalizeFeedbackInput(feedbackInput);
+    
+    if (!validation.isValid) {
+      throw new Error(`Validation failed: ${validation.errors.join(', ')}`);
+    }
+
     const id = uuidv4();
+    const now = new Date();
     const data = {
       id,
-      ...feedbackData,
-      timestamp: feedbackData.timestamp || new Date(),
+      text: normalized.text,
+      category: normalized.category || 'other',
+      sentiment: normalized.sentiment || 0,
+      confidence: normalized.confidence || 0,
+      timestamp: now,
+      processed: false,
+      created_at: now,
+      updated_at: now
     };
 
     await this.insert(data);
@@ -58,6 +73,34 @@ export class FeedbackRepository extends BaseRepository {
       page,
       limit
     };
+  }
+
+  // Update feedback with validation
+  async update(id: string, updateInput: FeedbackUpdateInput): Promise<Feedback | null> {
+    // Validate the update input
+    if (updateInput.text !== undefined) {
+      const textValidation = validateFeedbackInput({ text: updateInput.text });
+      if (!textValidation.isValid) {
+        throw new Error(`Text validation failed: ${textValidation.errors.join(', ')}`);
+      }
+    }
+
+    const updateData: Record<string, any> = {
+      updated_at: new Date()
+    };
+
+    if (updateInput.text !== undefined) updateData.text = updateInput.text.trim();
+    if (updateInput.category !== undefined) updateData.category = updateInput.category;
+    if (updateInput.sentiment !== undefined) updateData.sentiment = updateInput.sentiment;
+    if (updateInput.confidence !== undefined) updateData.confidence = updateInput.confidence;
+    if (updateInput.processed !== undefined) updateData.processed = updateInput.processed;
+
+    const success = await this.updateById(id, updateData);
+    if (!success) {
+      return null;
+    }
+
+    return await this.findById<Feedback>(id);
   }
 
   // Update feedback processing status
